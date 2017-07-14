@@ -1,5 +1,4 @@
-#!/usr/bin/python3
-
+### Import dependencies
 import gspread
 from urllib.request import urlopen
 import json
@@ -12,11 +11,16 @@ from oauth2client.service_account import ServiceAccountCredentials
 import re
 import cache_parser as cp
 import shutil
+from pandas.io import gbq
 
 
-### OAuth2 credentialing and authentication; give gspread permissions 
-scopes = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-credentials = ServiceAccountCredentials.from_json_keyfile_name('./client_secret.json', scopes=scopes)
+### OAuth2 credentialing and authentication; give gspread, gbq permissions 
+scopes = ['https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/drive',
+        "https://www.googleapis.com/auth/bigquery.insertdata",
+        "https://www.googleapis.com/auth/bigquery",
+        "https://www.googleapis.com/auth/cloud-platform"]
+credentials = ServiceAccountCredentials.from_json_keyfile_name('./ka_cred.json', scopes=scopes)
 client = gspread.authorize(credentials)
 
 ### Load input parameters for API calls 
@@ -68,6 +72,9 @@ def write_to_log(sites, endpoint_categories, endpoints):
     if not os.path.isfile(filename_last_log) or os.stat(filename_last_log).st_size == 0:
 
         # CODE HERE FOR RESETTING DATA IF NEW DIMENSIONS ADDED 
+        # Fix headers to include new column names
+        # Pull complete history of new fields, but only incremental info for
+        # existing fields
 
         start_date_obj = lastMonth + relativedelta(months=-24)
         log = filename_last_log
@@ -142,7 +149,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
         
 
 def write_to_outfile(df):
-    
+    '''    
     # Checks last ouput CSV; MUST HAVE AT LEAST 'out_start.csv'!
     if not os.path.isfile(filename_last_csv) or os.stat(filename_last_csv).st_size == 0:
         csv = filename_last_csv
@@ -169,8 +176,14 @@ def write_to_outfile(df):
    
     # Overwrite last published data
     shutil.copyfile(csv, "./data_source.csv")
-
     print("Done writing to outfile!")
+    '''    
+    # Write to BigQuery table
+    gbq.to_gbq(df, "ravi.cad_data", "khanacademy.org:deductive-jet-827", chunksize=10000,
+            verbose=True, reauth=False, if_exists='append',
+            private_key="./ka_cred.json")
+
+
     return
 
 
@@ -189,7 +202,7 @@ if __name__ == "__main__":
         log_file = filename_last_log
 
     # Governs if log is written to an outfile
-    log_to_out_on = False
+    log_to_out_on = True
     if log_to_out_on:
         df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
         print(df.head(15))
