@@ -87,7 +87,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
 
     start_date = start_date_obj.strftime("%Y-%m")
 
-    # HELPER FUNCTION: Extract data, unless error (writes to error log)
+    ### HELPER FUNCTION: Extract data, unless error (writes to error log)
     def extractor(site, endpoint_category, version, endpoint, start_date, end_date, granularity="monthly"):
 
         # API static input variables
@@ -149,7 +149,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
         
 
 def write_to_outfile(df):
-    '''    
+    
     # Checks last ouput CSV; MUST HAVE AT LEAST 'out_start.csv'!
     if not os.path.isfile(filename_last_csv) or os.stat(filename_last_csv).st_size == 0:
         csv = filename_last_csv
@@ -174,37 +174,33 @@ def write_to_outfile(df):
         sheet.update_cell(latest_csv_coords[0]+1, 2, csv)
         print("Outfile filename written to 'data_parameters'!")
    
-    # Overwrite last published data
-    shutil.copyfile(csv, "./data_source.csv")
     print("Done writing to outfile!")
-    '''    
-    # Write to BigQuery table
-    gbq.to_gbq(df, "ravi.cad_data", "khanacademy.org:deductive-jet-827", chunksize=10000,
-            verbose=True, reauth=False, if_exists='append',
-            private_key="./ka_cred.json")
-
-
-    return
+    return df
 
 
 ### EXECUTION OF CODE
 if __name__ == "__main__":
 
-    # Governs whether API requests will be made
+    requests_on = True
+    log_to_out_on = True
 
-    # CODE HERE FOR DETERMINING 'request_on' VALUE
-    # Things to check: last month of data, if fields or endpoints were added
-
-    requests_on = False
     if requests_on:
         log_file = write_to_log(parameters["site_url"], parameters["endpoint_category"], parameters["endpoint"]) 
     else:
         log_file = filename_last_log
 
     # Governs if log is written to an outfile
-    log_to_out_on = True
     if log_to_out_on:
         df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
-        print(df.head(15))
-        write_to_outfile(df)
+        print(df.head(10))
+        
+        # Write to outfile, pass on DataFrame
+        BQ_df = write_to_outfile(df)
+
+        # Append to BigQuery table
+        print(BQ_df.head(10))
+        gbq.to_gbq(BQ_df, "ravi.cad_data_short", "khanacademy.org:deductive-jet-827",
+                chunksize=5000, verbose=True, reauth=False, if_exists='append',
+            private_key="./ka_cred.json")
+        print("Done writing to BQ!")
 

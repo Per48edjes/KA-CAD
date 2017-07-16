@@ -1,3 +1,4 @@
+### Import dependencies
 import json
 import pandas as pd
 
@@ -9,7 +10,7 @@ def df_creator(data_dict, df_merge_fields):
     col_labels = ["site_url", "endpoint_category", "endpoint", "date", "value"]    
     master = pd.DataFrame(columns = col_labels)
 
-    # HELPER FUNCTION: Makes mini-dataframes for appending to 'master'
+    ### HELPER FUNCTION: Makes mini-dataframes for appending to 'master'
     def json_parser(list_of_jsons):
 
         # Create empty dataframe for appending site info to
@@ -35,20 +36,45 @@ def df_creator(data_dict, df_merge_fields):
         site_name = k
         master = master.append(json_parser(jsons)) 
 
-    # Add other (non-API request) fields to data
-    merged_master = master.merge(df_merge_fields, on="site_url")
+    ### HELPER FUNCTION: Does all transformations to 'master' 
+    def transform(master):
+        
+        ## Add other (non-API request) fields to data
+        merged_master = master.merge(df_merge_fields, on="site_url")
 
-    # Transform 'merged_master' (to import into GDS)
-    master = merged_master.set_index(["group_site", "KA_initiative", "site_url", "site_name",
-        "endpoint_category", "date", "endpoint"])
+        # Transform 'merged_master' (to import into GDS)
+        master = merged_master.set_index(["group_site", "KA_initiative", "site_url", "site_name",
+            "endpoint_category", "date", "endpoint"])
 
-    # Move value fields to end, grouped by date
-    master = master.unstack(level=-1).reset_index()
-    master.columns = [' '.join(col).strip() if "value" not in col else
-            list(filter(lambda x: x != "value", col))[0] for col in master.columns.values]
+        # Move value fields to end, grouped by date
+        master = master.unstack(level=-1).reset_index()
+        master.columns = [' '.join(col).strip() if "value" not in col else
+                list(filter(lambda x: x != "value", col))[0] for col in master.columns.values]
 
-    print("Done making master DataFrame!")
-    return master
+        ## Add 'learning_time_mins' field
+        master["LT_mins"] = master["visits"] * master["average_visit_duration"] / 60.0
+
+        ## Add 'normalized_LT_by_KA' field
+
+        # Create indexed version of 'df'
+        indexed_df = master.set_index(['group_site',  'KA_initiative', 'site_name', 'site_url', 'endpoint_category', 'date'])
+
+        # Index of 'normalizer' site
+        index_stem = ['KA (SimilarWeb)', 'All', 'Khan Academy', 'khanacademy.org']
+
+        # Write a helper function to then apply to each rows 
+        def normalizer(df, x, index_stem, endpoint_category, date, column):
+            normalizer_data = df.loc[tuple(index_stem + [endpoint_category] + [date]),['LT_mins']]
+            return x / normalizer_data
+
+        # Execute apply
+        master['norm_LT'] = master.apply(lambda row: normalizer(indexed_df, row['LT_mins'], index_stem, row['endpoint_category'], row['date'], 'LT_mins'), axis=1)
+
+        print("Done making master DataFrame!")
+
+        return master
+
+    return transform(master)
 
 
 ### FUNCTION: Opens the cache and read data to dictionary (by site)
