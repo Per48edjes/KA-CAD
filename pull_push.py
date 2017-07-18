@@ -181,26 +181,29 @@ def write_to_outfile(df):
 ### EXECUTION OF CODE
 if __name__ == "__main__":
 
-    requests_on = True
-    log_to_out_on = True
+    requests_on = False
+    log_to_out_on = False
+    BQ_write_on = False
 
     if requests_on:
         log_file = write_to_log(parameters["site_url"], parameters["endpoint_category"], parameters["endpoint"]) 
     else:
         log_file = filename_last_log
 
-    # Governs if log is written to an outfile
+    # Generate DataFrame for writing
+    df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
+    print(df.head(10))
+
     if log_to_out_on:
-        df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
-        print(df.head(10))
-        
+
         # Write to outfile, pass on DataFrame
         BQ_df = write_to_outfile(df)
 
         # Append to BigQuery table
         print(BQ_df.head(10))
-        gbq.to_gbq(BQ_df, "ravi.cad_data_short", "khanacademy.org:deductive-jet-827",
-                chunksize=5000, verbose=True, reauth=False, if_exists='append',
-            private_key="./ka_cred.json")
-        print("Done writing to BQ!")
+        if BQ_write_on:
+            gbq.to_gbq(BQ_df, "ravi.cad_data_short", "khanacademy.org:deductive-jet-827",
+                    chunksize=5000, verbose=True, reauth=False, if_exists='append',
+                private_key="./ka_cred.json")
+            print("Done writing to BQ!")
 
