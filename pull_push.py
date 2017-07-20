@@ -58,6 +58,8 @@ endpoint_cat_version_map = df_map.to_dict()["version"]
 filename_last_log = parameters[headers[headers.index("log")]][-1] 
 filename_last_csv = parameters[headers[headers.index("outfile")]][-1] 
 
+# Set BigQuery table name
+BQ_table_name = "ravi.cad_data_short"
 
 def write_to_log(sites, endpoint_categories, endpoints):
 
@@ -180,10 +182,10 @@ def write_to_outfile(df):
 
 ### EXECUTION OF CODE
 if __name__ == "__main__":
-
-    requests_on = False
-    log_to_out_on = False
-    BQ_write_on = False
+    
+    requests_on = True
+    log_to_out_on = True
+    BQ_write_on = True
 
     if requests_on:
         log_file = write_to_log(parameters["site_url"], parameters["endpoint_category"], parameters["endpoint"]) 
@@ -202,7 +204,7 @@ if __name__ == "__main__":
         # Append to BigQuery table
         print(BQ_df.head(10))
         if BQ_write_on:
-            gbq.to_gbq(BQ_df, "ravi.cad_data_short", "khanacademy.org:deductive-jet-827",
+            gbq.to_gbq(BQ_df, BQ_table_name, "khanacademy.org:deductive-jet-827",
                     chunksize=5000, verbose=True, reauth=False, if_exists='append',
                 private_key="./ka_cred.json")
             print("Done writing to BQ!")
