@@ -1,3 +1,7 @@
+'''
+SETTING UP THE ENVIRONMENT
+'''
+
 ### Import dependencies
 import gspread
 from urllib.request import urlopen
@@ -60,6 +64,12 @@ filename_last_csv = parameters[headers[headers.index("outfile")]][-1]
 
 # Set BigQuery table name
 BQ_table_name = "ravi.cad_data_short"
+
+
+'''
+FUNCTIONS TO DO THE 'PULLING' AND 'PUSHING'
+'''
+
 
 def write_to_log(sites, endpoint_categories, endpoints):
 
@@ -180,25 +190,31 @@ def write_to_outfile(df):
     return df
 
 
-### EXECUTION OF CODE
+'''
+EXECUTION OF SCRIPT
+'''
+
+
 if __name__ == "__main__":
-    
+   
+    # Flow control
     requests_on = True
     log_to_out_on = True
     BQ_write_on = True
 
+    # Generate 
     if requests_on:
         log_file = write_to_log(parameters["site_url"], parameters["endpoint_category"], parameters["endpoint"]) 
     else:
         log_file = filename_last_log
 
-    # Generate DataFrame for writing
+    # Generate 'master' for writing
     df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
     print(df.head(10))
 
     if log_to_out_on:
 
-        # Write to outfile, pass on DataFrame
+        # Write to outfile, pass on 'master' to be written into BQ
         BQ_df = write_to_outfile(df)
 
         # Append to BigQuery table
