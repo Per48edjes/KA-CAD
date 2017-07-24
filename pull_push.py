@@ -79,14 +79,12 @@ def write_to_log(sites, endpoint_categories, endpoints):
     lastMonth = first - datetime.timedelta(days=1)
     end_date = lastMonth.strftime("%Y-%m")
 
-    # Start date/log is dynamic depending on what's in the cache/what last
-    # cache is; MUST HAVE AT LEAST 'data_start.txt'!
+    # MUST HAVE AT LEAST 'data_start.txt'!
+    start_date_obj = lastMonth + relativedelta(months=-24)
     if not os.path.isfile(filename_last_log) or os.stat(filename_last_log).st_size == 0:
-        start_date_obj = lastMonth + relativedelta(months=-24)
         log = filename_last_log
         flag_new = False
     else:
-        start_date_obj = lastMonth
         now = datetime.datetime.now()
         log = "logs/" + now.strftime("%Y-%m-%d_%H:%M") + ".txt"
         flag_new = True
@@ -200,9 +198,9 @@ EXECUTION OF SCRIPT
 if __name__ == "__main__":
    
     # Flow control
-    requests_on = False
-    log_to_out_on = False
-    BQ_write_on = False
+    requests_on = True
+    log_to_out_on = True
+    BQ_write_on = True
 
     # SWITCH: API Requests
     if requests_on:

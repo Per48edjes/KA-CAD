@@ -98,6 +98,7 @@ def df_creator(data_dict, df_merge_fields):
         master = yoyer(master) 
 
         print('Done all dataframe manipulations!')
+        print("Master's FINAL dimensions: " + str(master.shape))
         return master
 
     return transform(master)
