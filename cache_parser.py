@@ -11,19 +11,20 @@ FUNCTIONS THAT READ FROM CACHE AND CREATE 'MASTER' DATAFRAME
 
 ### FUNCTION: Opens the cache and read data to dictionary (by site)
 def log_opener(file_path):
+    print("Opening log: " + file_path)
     site_dict = {}     
-    last_site_scanned = None 
+    site_scanned = [] 
 
     with open(file_path) as f:
         for line in f:
             try:
                 json_data = json.loads(line)  
                 site = json_data["meta"]["request"]["domain"] 
-                if site != last_site_scanned:
+                if site not in site_scanned:
                     site_dict[site] = [json_data]
+                    site_scanned.append(site)
                 else:
                     site_dict[site].append(json_data)
-                last_site_scanned = site
             except:
                 print("Skipped a line! Check error log for bad data.")
 
@@ -48,10 +49,6 @@ def df_creator(data_dict, df_merge_fields):
         for metric in list_of_jsons:
             endpoint = [key for key in metric.keys() if key != "meta"][0]
             endpoint_category = metric["meta"]["request_parameters"]["endpoint_category"]
-            '''
-            Table structure:
-            SITE_NAME ... ENDPOINT CATEGORY ... ENDPOINT ... DATE ... VALUE
-            '''
             data = [[site_name, endpoint_category, endpoint, d["date"], d[endpoint]] for d in metric[endpoint]]
             site_df = pd.DataFrame(data, columns = col_labels)
             df = df.append(site_df)    
@@ -64,6 +61,14 @@ def df_creator(data_dict, df_merge_fields):
         site_name = k
         master = master.append(json_parser(jsons)) 
 
+    # Remove any duplicate rows
+    print("Master's dimensions: " + str(master.shape))
+    master.drop_duplicates(keep='last', inplace=True)
+    print("Removing duplicates before transformations...")
+    print("Any duplicated rows in dataframe? " + str(master.duplicated().any())
+            + "!")
+    print("Master's dimensions after duplicate removal: " + str(master.shape))
+    
     ### HELPER FUNCTION: Does all transformations to 'master' 
     def transform(master):
         
@@ -92,9 +97,9 @@ def df_creator(data_dict, df_merge_fields):
         # Add % Y/Y calculations
         master = yoyer(master) 
 
+        print('Done all dataframe manipulations!')
         return master
 
-    print('Done all dataframe manipulations!')
     return transform(master)
 
 

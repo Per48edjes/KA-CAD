@@ -82,12 +82,6 @@ def write_to_log(sites, endpoint_categories, endpoints):
     # Start date/log is dynamic depending on what's in the cache/what last
     # cache is; MUST HAVE AT LEAST 'data_start.txt'!
     if not os.path.isfile(filename_last_log) or os.stat(filename_last_log).st_size == 0:
-
-        # CODE HERE FOR RESETTING DATA IF NEW DIMENSIONS ADDED 
-        # Fix headers to include new column names
-        # Pull complete history of new fields, but only incremental info for
-        # existing fields
-
         start_date_obj = lastMonth + relativedelta(months=-24)
         log = filename_last_log
         flag_new = False
@@ -139,9 +133,6 @@ def write_to_log(sites, endpoint_categories, endpoints):
     for site in sites:
         for endpoint_category in endpoint_categories:
             for endpoint in endpoints:
-
-    # CODE HERE for preventing making requests if data already in log
-
                 extracted_data = extractor(site, endpoint_category, endpoint_cat_version_map[endpoint_category], endpoint, start_date, end_date) 
                 all_json_data.append(extracted_data)
 
@@ -151,13 +142,30 @@ def write_to_log(sites, endpoint_categories, endpoints):
             f.write(json.dumps(line))
             f.write("\n")
 
-    # Write NEW filename to 'data_parameters' under most recent log
+    # Update 'data_parameters'; combine log histories if incremental update
     if flag_new:
-        sheet.update_cell(latest_log_coords[0]+1, 1, log)
-        print("Log filename written to 'data_parameters'!")
+        
+        # Copy 'filename_last_log' file; append lastest log
+        combined_log = log[:-4] + "_concat.txt" 
+        
+        # Concatenate 'combined_log' and 'log'
+        filenames = [filename_last_log, log]
+        with open(combined_log, 'w') as outfile:
+            for fname in filenames:
+                with open(fname) as infile:
+                    for line in infile:
+                        outfile.write(line)
 
-    print("Done writing to log!")
-    return log 
+        # Update 'data_parameters' with 'log' and 'combined_log'
+        sheet.update_cell(latest_log_coords[0]+1, 1, log)
+        sheet.update_cell(latest_log_coords[0]+2, 1, combined_log)
+        
+        print("Log filenames written to 'data_parameters'!")
+        print("Done writing both logs: " + log + ", " + combined_log)
+        return combined_log 
+    else:
+        print("Done writing to new, 24-month log: " + log)
+        return log 
         
 
 def write_to_outfile(df):
@@ -171,22 +179,16 @@ def write_to_outfile(df):
         csv = "outfiles/" + now.strftime("%Y-%m-%d_%H:%M") + ".csv"
         flag_new = True
 
-        # Copy old file to new file    
-        shutil.copyfile(filename_last_csv, csv)
-
     with open(csv, 'a+') as outfile:
         # Writes the DataFrame to a CSV
-        if flag_new:
-            df.to_csv(outfile, header=False, index=False)
-        else:
-            df.to_csv(outfile, header=True, index=False)
+        df.to_csv(outfile, header=True, index=False)
 
     # Write NEW filename to 'data_parameters' under most recent outfile
     if flag_new:
         sheet.update_cell(latest_csv_coords[0]+1, 2, csv)
         print("Outfile filename written to 'data_parameters'!")
    
-    print("Done writing to outfile!")
+    print("Done writing to outfile: " + csv)
     return df
 
 
@@ -198,11 +200,11 @@ EXECUTION OF SCRIPT
 if __name__ == "__main__":
    
     # Flow control
-    requests_on = True
-    log_to_out_on = True
-    BQ_write_on = True
+    requests_on = False
+    log_to_out_on = False
+    BQ_write_on = False
 
-    # Generate 
+    # SWITCH: API Requests
     if requests_on:
         log_file = write_to_log(parameters["site_url"], parameters["endpoint_category"], parameters["endpoint"]) 
     else:
@@ -210,18 +212,21 @@ if __name__ == "__main__":
 
     # Generate 'master' for writing
     df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
-    print(df.head(10))
 
+    # SWITCH: Writing to outfile
     if log_to_out_on:
-
         # Write to outfile, pass on 'master' to be written into BQ
         BQ_df = write_to_outfile(df)
+        print("Opening newly created outfile!")
+    else:
+        BQ_df = pd.read_csv(filename_last_csv) 
+        print("Opening existing outfile: " + filename_last_csv)
 
-        # Append to BigQuery table
-        print(BQ_df.head(10))
-        if BQ_write_on:
-            gbq.to_gbq(BQ_df, BQ_table_name, "khanacademy.org:deductive-jet-827",
-                    chunksize=5000, verbose=True, reauth=False, if_exists='append',
-                private_key="./ka_cred.json")
-            print("Done writing to BQ!")
+    # SWITCH: Write to BigQuery table
+    if BQ_write_on:
+        print("Preparing to stream into BigQuery!")
+        gbq.to_gbq(BQ_df, BQ_table_name, "khanacademy.org:deductive-jet-827",
+                chunksize=5000, verbose=True, reauth=False,
+                if_exists='replace', private_key="./ka_cred.json")
+        print("Done writing to BQ!")
 
