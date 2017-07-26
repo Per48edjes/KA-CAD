@@ -63,18 +63,19 @@ def df_creator(data_dict, df_merge_fields):
 
     # Remove any duplicate rows
     print("Master's dimensions: " + str(master.shape))
-    master.drop_duplicates(keep='last', inplace=True)
+    master.drop_duplicates(subset=["site_url",
+    "endpoint_category", "endpoint", "date"], keep='last', inplace=True)
     print("Removing duplicates before transformations...")
     print("Any duplicated rows in dataframe? " + str(master.duplicated().any())
             + "!")
     print("Master's dimensions after duplicate removal: " + str(master.shape))
-    
+
     ### HELPER FUNCTION: Does all transformations to 'master' 
     def transform(master):
         
         # Add other (non-API request) fields to data
         merged_master = master.merge(df_merge_fields, on="site_url")
-
+       
         # Transform 'merged_master' (to import into GDS)
         master = merged_master.set_index(["group_site", "KA_initiative", "site_url", "site_name",
             "endpoint_category", "date", "endpoint"])
@@ -83,9 +84,14 @@ def df_creator(data_dict, df_merge_fields):
         master = master.unstack(level=-1).reset_index()
         master.columns = [' '.join(col).strip() if "value" not in col else
                 list(filter(lambda x: x != "value", col))[0] for col in master.columns.values]
+        
+        # Add learning time (mins.) field
+        master['LT_mins'] = master['visits'] * master['average_visit_duration'] / 60.0
 
-        # Add learning time (in minutes) field
-        master["LT_mins"] = master["visits"] * master["average_visit_duration"] / 60.0
+        # GroupBy 'group_site'...
+        master = master.groupby(['group_site', 'KA_initiative',
+            'endpoint_category', 'date']).sum()
+        master['average_visit_duration'] = master['LT_mins'] / master['visits']
 
         # Add normalized LT field
         master = normalize_LT(master)
@@ -112,10 +118,16 @@ FUNCTIONS TRANSFORMING 'MASTER' DATAFRAME
 def normalize_LT(df):
 
     # Create indexed version of 'df'
-    indexed_df = df.set_index(['group_site',  'KA_initiative', 'site_name', 'site_url', 'endpoint_category', 'date'])
+    indexed_df = df
+
+    # Fix 'lexsort' issue
+    indexed_df = indexed_df.sort_index()
+
+    # De-index 'df'
+    df.reset_index(inplace=True)
 
     # Index of 'normalizer' site
-    index_stem = ['KA (SimilarWeb)', 'All', 'Khan Academy', 'khanacademy.org']
+    index_stem = ['KA (SimilarWeb)', 'All']
 
     # Write a helper function to then apply to each rows 
     def normalizer(df, x, index_stem, endpoint_category, date, column):
@@ -131,12 +143,12 @@ def normalize_LT(df):
 ### FUNCTION: Joins the TTM dataframes
 def TTMdf_joiner(df, *args):
 
-    indexed_df = df.set_index(['group_site',  'KA_initiative', 'site_name', 'site_url', 'endpoint_category', 'date'])
+    indexed_df = df.set_index(['group_site',  'KA_initiative', 'endpoint_category', 'date'])
     
     ### HELPER FUNCTION: Add TTM fields
     def TTMer(df, func):
 
-        indexed_df = df.set_index(['group_site',  'KA_initiative', 'site_name', 'site_url', 'endpoint_category', 'date'])
+        indexed_df = df.set_index(['group_site',  'KA_initiative', 'endpoint_category', 'date'])
 
         # Save original indexed_df to join with calculated dataframe later
         og_indexed_df = indexed_df.copy()
@@ -159,7 +171,7 @@ def TTMdf_joiner(df, *args):
 
         # Set indices for join
         indexed_df.reset_index(inplace=True)
-        indexed_df.set_index(['group_site',  'KA_initiative', 'site_name', 'site_url', 'endpoint_category', 'date'], inplace=True)
+        indexed_df.set_index(['group_site',  'KA_initiative', 'endpoint_category', 'date'], inplace=True)
 
         print('Successfully wrote TTM data!')
         return indexed_df
@@ -180,7 +192,7 @@ def TTMdf_joiner(df, *args):
 ### FUNCTION: Calculates %Y/Y for every datafield
 def yoyer(df):
     # Index the dataframe so only endpoints are column values
-    indexed_df = df.set_index(['group_site',  'KA_initiative', 'site_name', 'site_url', 'endpoint_category', 'date'])
+    indexed_df = df.set_index(['group_site',  'KA_initiative', 'endpoint_category', 'date'])
     indexed_df.sortlevel(inplace=True)
 
     #Helper function to perform % y/y calculation

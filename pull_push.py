@@ -198,9 +198,9 @@ EXECUTION OF SCRIPT
 if __name__ == "__main__":
    
     # Flow control
-    requests_on = True
-    log_to_out_on = True
-    BQ_write_on = True
+    requests_on = False
+    log_to_out_on = False
+    BQ_write_on = False
 
     # SWITCH: API Requests
     if requests_on:
