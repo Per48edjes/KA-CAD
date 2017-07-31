@@ -3,6 +3,8 @@ import json
 import pandas as pd
 import datetime
 from dateutil.relativedelta import relativedelta
+import re
+
 
 '''
 FUNCTIONS THAT READ FROM CACHE AND CREATE 'MASTER' DATAFRAME
@@ -103,9 +105,19 @@ def df_creator(data_dict, df_merge_fields):
         # Add % Y/Y calculations
         master = yoyer(master) 
 
+        # Add % M/M calculations
+        master = momer(master) 
+
+        # Drop useless columns
+        cols_to_drop = [col for col in master.columns if col.find("pct_yoy_pct_mom") != -1]
+        for col in cols_to_drop:
+            del master[col]
+        print('Dropped needless columns!')
+       
         print('Done all dataframe manipulations!')
         print("Master's FINAL dimensions: " + str(master.shape))
         return master
+
 
     return transform(master)
 
@@ -221,5 +233,40 @@ def yoyer(df):
 
     # Return dataframe (unindexed)
     print('Successfully wrote %YOY columns!')
+    return indexed_df.reset_index()
+
+
+### FUNCTION: Calculates %Y/Y for every datafield
+def momer(df):
+    # Index the dataframe so only endpoints are column values
+    indexed_df = df.set_index(['group_site', 'KA_initiative', 'endpoint_category', 'date'])
+    indexed_df.sortlevel(inplace=True)
+
+    #Helper function to perform % m/m calculation
+    def mom_calculator(df, row, col):
+        key = list(row.name)
+        curr_row_date = datetime.datetime.strptime(key.pop(), '%Y-%m-%d').date()
+        base_date = curr_row_date + relativedelta(months=-1)
+        base_key = tuple(key + [str(base_date)])
+        if base_key in df.index:
+            month_0 = df.loc[base_key, col]
+            month_1 = df.loc[tuple(key+[str(curr_row_date)]), col]
+            if month_0 != 0.0:
+                try:
+                    pct_chg = (month_1/month_0) - 1
+                    return pct_chg
+                except:
+                    return
+            else:
+                return
+        else:
+            return
+
+    # Execute apply of 'mom_calculator' by row
+    for col in indexed_df.columns:    
+        indexed_df[col+'_pct_mom'] = indexed_df.apply(lambda x: mom_calculator(indexed_df, x, col), axis=1)
+
+    # Return dataframe (unindexed)
+    print('Successfully wrote %MOM columns!')
     return indexed_df.reset_index()
 

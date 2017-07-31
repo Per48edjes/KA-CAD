@@ -63,7 +63,7 @@ filename_last_log = parameters[headers[headers.index("log")]][-1]
 filename_last_csv = parameters[headers[headers.index("outfile")]][-1] 
 
 # Set BigQuery table name
-BQ_table_name = "ravi.cad_data_short"
+BQ_table_name = "ravi.cad_data"
 
 
 '''
@@ -198,9 +198,9 @@ EXECUTION OF SCRIPT
 if __name__ == "__main__":
    
     # Flow control
-    requests_on = False
-    log_to_out_on = False
-    BQ_write_on = False
+    requests_on = True
+    log_to_out_on = True
+    BQ_write_on = True
 
     # SWITCH: API Requests
     if requests_on:
