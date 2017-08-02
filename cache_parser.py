@@ -18,7 +18,9 @@ def log_opener(file_path):
     site_scanned = [] 
 
     with open(file_path) as f:
+        line_num = 0
         for line in f:
+            line_num += 1
             try:
                 json_data = json.loads(line)  
                 site = json_data["meta"]["request"]["domain"] 
@@ -27,8 +29,9 @@ def log_opener(file_path):
                     site_scanned.append(site)
                 else:
                     site_dict[site].append(json_data)
-            except:
-                print("Skipped a line! Check error log for bad data.")
+            except Exception as e:
+                print(e)
+                print("Skipped a line ({})! Check error log for bad data.".format(str(line_num)))
 
     print("Done opening log!")
     return site_dict
@@ -144,7 +147,7 @@ def normalize_LT(df):
     # Write a helper function to then apply to each rows 
     def normalizer(df, x, index_stem, endpoint_category, date, column):
         normalizer_data = df.loc[tuple(index_stem + [endpoint_category] +
-            [date]),[column]]
+            [date]), [column]]
         return x / normalizer_data
 
     # Execute apply

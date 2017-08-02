@@ -100,12 +100,14 @@ def write_to_log(sites, endpoint_categories, endpoints):
     print("Pulling data from: " + start_date)
     print("...to: " + end_date)
 
+    # Get SimilarWeb API Key
+    with open("sw_cred.txt", 'r') as f:
+        API_key = f.readline().replace('\n','')
 
     ### HELPER FUNCTION: Extract data, unless error (writes to error log)
     def extractor(site, endpoint_category, version, endpoint, start_date, end_date, granularity="monthly"):
 
         # API static input variables
-        API_key = "?api_key=08cdbb7d6a7be88a31ac85e85b219dcc"
         domain = "https://api.similarweb.com/"
         out_form = "&format=json"
 
@@ -117,8 +119,9 @@ def write_to_log(sites, endpoint_categories, endpoints):
             response = urlopen(API_link)
             d = json.load(response)
 
-        except: 
-            d = {"meta": {"status": "404 ERROR"}}
+        except Exception as e: 
+            d = {"meta": {"status": "ERROR"}}
+            print(e)
 
         # Add parameter information to the JSON request output
         d["meta"]["request_parameters"] = {"site": site, "endpoint_category" :
@@ -135,7 +138,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
                 print("Wrote error to error log!")
         else:   
             return d
-
+    
     # Generate log data
     all_json_data = []
     for site in sites:
