@@ -139,11 +139,12 @@ def normalize_LT(df):
     df.reset_index(inplace=True)
 
     # Index of 'normalizer' site
-    index_stem = ['KA (SimilarWeb)', 'All']
+    index_stem = ['KA (SimilarWeb)', 'Comp']
 
     # Write a helper function to then apply to each rows 
     def normalizer(df, x, index_stem, endpoint_category, date, column):
-        normalizer_data = df.loc[tuple(index_stem + [endpoint_category] + [date]),['LT_mins']]
+        normalizer_data = df.loc[tuple(index_stem + [endpoint_category] +
+            [date]),[column]]
         return x / normalizer_data
 
     # Execute apply

@@ -73,11 +73,17 @@ FUNCTIONS TO DO THE 'PULLING' AND 'PUSHING'
 
 def write_to_log(sites, endpoint_categories, endpoints):
 
-    # End date is the most recent month
+    # End date is the most recent month; adjust for time in month.
     today = datetime.date.today()
     first = today.replace(day=1)
     lastMonth = first - datetime.timedelta(days=1)
-    end_date = lastMonth.strftime("%Y-%m")
+   
+    # Give SimilarWeb time to update database (15 days)
+    if today.day > 15:
+        end_date = lastMonth.strftime("%Y-%m")
+    else:
+        lastMonth = lastMonth + relativedelta(months=-1)
+        end_date = lastMonth.strftime("%Y-%m")
 
     # MUST HAVE AT LEAST 'data_start.txt'!
     start_date_obj = lastMonth + relativedelta(months=-24)
@@ -90,6 +96,10 @@ def write_to_log(sites, endpoint_categories, endpoints):
         flag_new = True
 
     start_date = start_date_obj.strftime("%Y-%m")
+
+    print("Pulling data from: " + start_date)
+    print("...to: " + end_date)
+
 
     ### HELPER FUNCTION: Extract data, unless error (writes to error log)
     def extractor(site, endpoint_category, version, endpoint, start_date, end_date, granularity="monthly"):
@@ -118,7 +128,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
         if d["meta"]["status"] != "Success":
             # Writing error into error log 
             print("ERROR HAPPENED!")
-            d["time"] = datetime.datime.now().strftime("%Y-%m-%d_%H:%M")
+            d["time"] = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M")
             with open('logs/extraction_error_log.txt','a+') as outfile:
                 outfile.write(json.dumps(d["meta"]))
                 outfile.write("\n")
@@ -164,7 +174,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
     else:
         print("Done writing to new, 24-month log: " + log)
         return log 
-        
+
 
 def write_to_outfile(df):
     
@@ -198,9 +208,9 @@ EXECUTION OF SCRIPT
 if __name__ == "__main__":
    
     # Flow control
-    requests_on = True
-    log_to_out_on = True
-    BQ_write_on = True
+    requests_on = False
+    log_to_out_on = False
+    BQ_write_on = False
 
     # SWITCH: API Requests
     if requests_on:
