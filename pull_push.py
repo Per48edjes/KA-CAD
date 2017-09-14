@@ -16,6 +16,7 @@ import re
 import cache_parser as cp
 import shutil
 from pandas.io import gbq
+from google.cloud import bigquery
 
 
 ### OAuth2 credentialing and authentication; give gspread, gbq permissions 
@@ -63,7 +64,7 @@ filename_last_log = parameters[headers[headers.index("log")]][-1]
 filename_last_csv = parameters[headers[headers.index("outfile")]][-1] 
 
 # Set BigQuery table name
-BQ_table_name = "ravi.cad_data"
+BQ_table_name = "ravi.cad_data_OLD"
 
 
 '''
@@ -78,15 +79,15 @@ def write_to_log(sites, endpoint_categories, endpoints):
     first = today.replace(day=1)
     lastMonth = first - datetime.timedelta(days=1)
    
-    # Give SimilarWeb time to update database (15 days)
-    if today.day > 15:
+    # Give SimilarWeb time to update database (10 days)
+    if today.day > 10:
         end_date = lastMonth.strftime("%Y-%m")
     else:
         lastMonth = lastMonth + relativedelta(months=-1)
         end_date = lastMonth.strftime("%Y-%m")
 
     # MUST HAVE AT LEAST 'data_start.txt'!
-    start_date_obj = lastMonth + relativedelta(months=-24)
+    start_date_obj = lastMonth + relativedelta(months=-17)
     if not os.path.isfile(filename_last_log) or os.stat(filename_last_log).st_size == 0:
         log = filename_last_log
         flag_new = False
@@ -117,6 +118,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
         # Attempt the API request
         try:
             response = urlopen(API_link)
+            print(response)
             d = json.load(response)
 
         except Exception as e: 
@@ -175,7 +177,7 @@ def write_to_log(sites, endpoint_categories, endpoints):
         print("Done writing both logs: " + log + ", " + combined_log)
         return combined_log 
     else:
-        print("Done writing to new, 24-month log: " + log)
+        print("Done writing to new, incremental log: " + log)
         return log 
 
 
@@ -202,6 +204,28 @@ def write_to_outfile(df):
     print("Done writing to outfile: " + csv)
     return df
 
+'''
+FUNCTIONS TO DO THE 'PULLING' AND 'PUSHING'
+'''
+
+def load_data_from_file(dataset_name, table_name, source_file_name):
+    bigquery_client = bigquery.Client()
+    dataset = bigquery_client.dataset(dataset_name)
+    table = dataset.table(table_name)
+
+    # Reload the table to get the schema.
+    table.reload()
+
+    with open(source_file_name, 'rb') as source_file:
+        job = table.upload_from_file(
+            source_file, source_format='text/csv')
+    
+    # Waits for job to complete
+    job.result()
+
+    print('Loaded {} rows into {}:{}.'.format(
+        job.output_rows, dataset_name, table_name))
+
 
 '''
 EXECUTION OF SCRIPT
@@ -213,7 +237,7 @@ if __name__ == "__main__":
     # Flow control
     requests_on = False
     log_to_out_on = False
-    BQ_write_on = False
+    BQ_write_on = True
 
     # SWITCH: API Requests
     if requests_on:
@@ -221,11 +245,12 @@ if __name__ == "__main__":
     else:
         log_file = filename_last_log
 
-    # Generate 'master' for writing
-    df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
-
     # SWITCH: Writing to outfile
     if log_to_out_on:
+
+        # Generate 'master' for writing
+        df = cp.df_creator(cp.log_opener(log_file), df_merge_fields)
+
         # Write to outfile, pass on 'master' to be written into BQ
         BQ_df = write_to_outfile(df)
         print("Opening newly created outfile!")
