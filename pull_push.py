@@ -64,7 +64,7 @@ filename_last_log = parameters[headers[headers.index("log")]][-1]
 filename_last_csv = parameters[headers[headers.index("outfile")]][-1] 
 
 # Set BigQuery table name
-BQ_table_name = "ravi.cad_data_OLD"
+BQ_table_name = "ravi.cad_data"
 
 
 '''
@@ -80,14 +80,14 @@ def write_to_log(sites, endpoint_categories, endpoints):
     lastMonth = first - datetime.timedelta(days=1)
    
     # Give SimilarWeb time to update database (10 days)
-    if today.day > 10:
+    if today.day >= 10:
         end_date = lastMonth.strftime("%Y-%m")
     else:
         lastMonth = lastMonth + relativedelta(months=-1)
         end_date = lastMonth.strftime("%Y-%m")
 
     # MUST HAVE AT LEAST 'data_start.txt'!
-    start_date_obj = lastMonth + relativedelta(months=-17)
+    start_date_obj = lastMonth + relativedelta(months=-15)
     if not os.path.isfile(filename_last_log) or os.stat(filename_last_log).st_size == 0:
         log = filename_last_log
         flag_new = False
@@ -118,7 +118,6 @@ def write_to_log(sites, endpoint_categories, endpoints):
         # Attempt the API request
         try:
             response = urlopen(API_link)
-            print(response)
             d = json.load(response)
 
         except Exception as e: 
@@ -235,8 +234,8 @@ EXECUTION OF SCRIPT
 if __name__ == "__main__":
    
     # Flow control
-    requests_on = False
-    log_to_out_on = False
+    requests_on = True
+    log_to_out_on = True
     BQ_write_on = True
 
     # SWITCH: API Requests
